@@ -33,7 +33,7 @@ features:
   n_fft: 512
   hop: 128
   frontend: PCEN
-  aug_Train: true
+  aug_train: true
 
 train:
   n_shot: 5
