@@ -82,7 +82,7 @@ def main(conf: DictConfig):
         protonet = Protonet(conf)
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
                                 dirpath=conf.path.model, 
-                                filename='latest_' + conf.set.data,
+                                filename='latest_{val_loss:.2f}_' + conf.set.data,
                                 monitor='val_loss',
                             )
         tb_logger.log_graph(protonet)

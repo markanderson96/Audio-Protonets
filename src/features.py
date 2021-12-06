@@ -182,7 +182,7 @@ def featureExtract(conf=None,mode=None):
     aug = False
 
     if mode == 'train':
-        aug = True
+        aug = conf.features.aug_train
         logger.info("=== Processing training set ===")
         csv_files = [file for path, _, _ in os.walk(conf.path.train_dir) 
                      for file in glob(os.path.join(path, '*.csv')) ]
