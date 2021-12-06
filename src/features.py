@@ -139,8 +139,14 @@ def melSpectFeature(conf, audio_path, df, aug):
                 chunk_feature = T.TimeMasking(time_mask_param=conf.features.time_mask)(chunk_feature)
         feature = torch.cat((feature, chunk_feature), dim=1)
 
-    feature = torch.unsqueeze(feature, dim=0)
-    feature = PCENTransform(conf=conf)(feature)
+    if conf.features.frontend == 'PCEN':
+        feature = torch.unsqueeze(feature, dim=0)
+        feature = PCENTransform(conf=conf)(feature)
+    elif conf.features.frontend == 'log':
+        feature = torch.log(feature + 1E-6)
+    else:
+        feature = feature
+
     feature = torch.squeeze(feature)
     feature = torch.transpose(feature, 0, 1) 
 

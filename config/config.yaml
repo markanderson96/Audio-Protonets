@@ -32,6 +32,7 @@ features:
   n_mels: 80
   n_fft: 512
   hop: 128
+  frontend: PCEN
 
 train:
   n_shot: 5
