@@ -88,7 +88,7 @@ def main(conf: DictConfig):
         tb_logger.log_graph(protonet)
         trainer = pl.Trainer(gpus=conf.set.gpus,
                             max_epochs=conf.train.epochs,
-                            callbacks=[checkpoint_callback],
+                            #callbacks=[checkpoint_callback],
                             logger=tb_logger,
                             fast_dev_run=False)
         trainer.fit(protonet, 
