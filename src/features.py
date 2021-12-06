@@ -120,30 +120,23 @@ def melSpectFeature(conf, audio_path, df, aug):
     resample = T.Resample(sr, conf.features.sample_rate)
     data = resample(data)
     #data = (data - torch.mean(data)) / torch.std(data)
-    chunk_samples = conf.features.sample_rate * 0.5
+    chunk_samples = conf.features.sample_rate * 5
     feature = torch.Tensor([])
     
     for idx in range(0, data.shape[1]-chunk_samples, chunk_samples):
-        chunk_feature = T.Spectrogram(
+        chunk_feature = T.MelSpectrogram(
             n_fft=conf.features.n_fft,
             hop_length=conf.features.hop,
-            power=None
+            power=1,
+            f_min=conf.features.fmin,
+            f_max=conf.features.fmax,
+            n_mels=conf.features.n_mels,
         )(data[0][idx:idx+chunk_samples])
         if aug:
-            chunk_feature = chunk_feature.abs()  
             if torch.rand(1) > 0.5:
                 chunk_feature = T.FrequencyMasking(freq_mask_param=conf.features.freq_mask)(chunk_feature)
             if torch.rand(1) > 0.5:  
                 chunk_feature = T.TimeMasking(time_mask_param=conf.features.time_mask)(chunk_feature)
-
-        chunk_feature = chunk_feature.abs()  
-        chunk_feature = T.MelScale(
-            sample_rate=conf.features.sample_rate,
-            f_min=conf.features.fmin,
-            f_max=conf.features.fmax,
-            n_mels=conf.features.n_mels,
-            n_stft=chunk_feature.shape[0],
-        )(chunk_feature)
         feature = torch.cat((feature, chunk_feature), dim=1)
 
     feature = torch.unsqueeze(feature, dim=0)

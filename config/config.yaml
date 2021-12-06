@@ -4,7 +4,7 @@ set:
   train: false
   eval: false
   gpus: 1
-  data: voice
+  data: bioacoustics
 
 path:
   root_dir: /home/mark/projects/DCASE2021
@@ -35,13 +35,15 @@ features:
 
 train:
   n_shot: 5
-  k_way: 20
+  k_way: 10
   epochs: 1000
   lr: 0.0001
   momentum: 0.85
   factor: 0.5
   threshold: 0.001
   patience: 10
+  distance: euclidean
+  norm: false
 
 eval:
   samples_neg: 512

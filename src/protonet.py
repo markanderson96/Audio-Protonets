@@ -36,6 +36,7 @@ class Protonet(pl.LightningModule):
         self.data_counter = 0
         self.y_val_emb = torch.tensor([])
         self.y_out_emb = torch.tensor([])
+        self.distance = conf.train.distance
     
     def forward(self, x):
         (num_samples, seq_len, fft_bins) = x.shape
@@ -66,7 +67,17 @@ class Protonet(pl.LightningModule):
         dists_e = euclidean_dist(q_samples, prototypes)
         dists_n = norm_dist(q_samples, prototypes)
         dists_m = man_dist(q_samples, prototypes)
-        dists = dists_m#torch.sqrt(dists_e + 0.5 * dists_n)
+        if self.distance == 'euclidean':
+            if self.norm:
+                dists = torch.sqrt(dists_e + 0.5 * dists_n)
+            else:
+                dists = dists_e
+        elif self.distance == 'manhattan':
+            if self.norm:
+                dists = torch.sqrt(dists_m + 0.5 * dists_n)
+            else:
+                dists = dists_m
+        
         log_p_y = F.log_softmax(-dists, dim=1).view(n_classes, n_query, -1)
 
         target_idxs = torch.arange(0, n_classes)
