@@ -1,0 +1,56 @@
+set:
+  features_train: false
+  features_test: false
+  train: false
+  eval: false
+  gpus: 1
+  data: voice
+
+path:
+  root_dir: /home/mark/projects/DCASE2021
+  data_dir: /home/mark/ssd/protonets/${set.data}/data
+  train_dir: ${path.data_dir}/Development_Set/Training_Set
+  val_dir: ${path.data_dir}/Development_Set/Validation_Set
+  test_dir: ${path.data_dir}/Development_Set/Validation_Set
+  feat_path: /home/mark/ssd/protonets/${set.data}/features
+  train_feat: ${path.feat_path}/feat_train
+  eval_feat: ${path.feat_path}/feat_eval
+  test_feat: ${path.feat_path}/feat_test
+  model: ${path.root_dir}/models
+  best_model: ${path.model}/best_${set.data}.ckpt
+  last_model: ${path.model}/latest_${set.data}.ckpt
+
+features:
+  freq_mask: 10
+  time_mask: 10
+  time_stretch: 1.1
+  seg_len: 0.2
+  hop_seg: 0.05
+  sample_rate: 22050
+  fmin: 600
+  fmax: 11025
+  n_mels: 80
+  n_fft: 512
+  hop: 128
+
+train:
+  n_shot: 5
+  k_way: 20
+  epochs: 1000
+  lr: 0.0001
+  momentum: 0.85
+  factor: 0.5
+  threshold: 0.001
+  patience: 10
+
+eval:
+  samples_neg: 512
+  iterations: 3
+  query_batch_size: 8
+  query_set_size: null
+  negative_set_batch_size: 16
+  threshold: 0.5
+
+post_proc:
+  path: ${path.val_dir}
+  threshold: 0.6
