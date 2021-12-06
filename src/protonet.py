@@ -37,6 +37,7 @@ class Protonet(pl.LightningModule):
         self.y_val_emb = torch.tensor([])
         self.y_out_emb = torch.tensor([])
         self.distance = conf.train.distance
+        self.norm = conf.train.norm
     
     def forward(self, x):
         (num_samples, seq_len, fft_bins) = x.shape
