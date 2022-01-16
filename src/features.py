@@ -9,6 +9,7 @@ import logging
 
 from glob import glob
 from itertools import chain
+from tqdm import tqdm
 
 from pcen import PCENTransform
 
@@ -16,7 +17,7 @@ log_fmt = '%(asctime)s - %(module)s - %(levelname)s - %(message)s'
 logging.basicConfig(level=logging.INFO, format=log_fmt)
 logger = logging.getLogger(__name__)
 
-def create_labels(df_pos, feature, glob_cls_name, train_file, seg_len, hop_seg, fps):
+def create_labels(df_pos, feature, glob_cls_name, train_file, seg_len, hop_seg, fps, conf=None):
 
     '''Chunk the time-frequecy representation to segment length and store in h5py dataset
     Args:
@@ -36,13 +37,10 @@ def create_labels(df_pos, feature, glob_cls_name, train_file, seg_len, hop_seg, 
     else:
         file_index = len(train_file['features'][:])
 
-
     start_time, end_time = time2frame(df_pos,fps)
-
 
     # For csv files with a column name Call,
     # pick up the global class name
-
     if 'CALL' in df_pos.columns:
         class_list = [glob_cls_name] * len(start_time)
     else:
@@ -64,7 +62,13 @@ def create_labels(df_pos, feature, glob_cls_name, train_file, seg_len, hop_seg, 
             while end_ind - (str_ind + shift) > seg_len:
 
                 feature_patch = feature[int(str_ind + shift):int(str_ind + shift + seg_len)]
-                
+                if label != "BG":
+                    feature_patch = torch.unsqueeze(feature_patch, dim=0)
+                    feature_patch = PCENTransform(conf=conf)(feature_patch)
+                    feature_patch = torch.squeeze(feature_patch)
+                else:
+                    feature_patch = torch.log(feature_patch + 1E-6)
+                    
                 train_file['features'].resize((file_index + 1, feature_patch.shape[0], feature_patch.shape[1]))
                 train_file['features'][file_index] = feature_patch
                 label_list.append(label)
@@ -72,33 +76,37 @@ def create_labels(df_pos, feature, glob_cls_name, train_file, seg_len, hop_seg, 
                 shift = shift + hop_seg
 
             feature_patch_last = feature[end_ind - seg_len:end_ind]
-
-            
             train_file['features'].resize((file_index + 1 , feature_patch.shape[0], feature_patch.shape[1]))
             
             train_file['features'][file_index] = feature_patch_last
             label_list.append(label)
             file_index += 1
 
-        else:
+        elif (end_ind - str_ind) < seg_len:
 
             # If patch length is less than segment length 
             # then tile the patch multiple times 
-
+            
             feature_patch = feature[str_ind:end_ind]
-            if feature_patch.shape[0] == 0:
-                logger.warning("The patch is of 0 length")
-                continue
+            #if feature_patch.shape[0] == 0:
+            #    logger.warning("The patch is of 0 length")
 
             repeat_num = int(seg_len / (feature_patch.shape[0])) + 1
             feature_patch_new = np.tile(feature_patch, (repeat_num, 1))
             feature_patch_new = feature_patch_new[0:int(seg_len)]
+            feature_patch_new = torch.tensor(feature_patch_new)
+            if label != "BG":
+                feature_patch_new = torch.unsqueeze(feature_patch_new, dim=0)
+                feature_patch_new = PCENTransform(conf=conf)(feature_patch_new)
+                feature_patch_new = torch.squeeze(feature_patch_new)
+            else:
+                feature_patch_new = torch.log(feature_patch_new + 1E-6)
             train_file['features'].resize((file_index+1, feature_patch_new.shape[0], feature_patch_new.shape[1]))
             train_file['features'][file_index] = feature_patch_new
             label_list.append(label)
             file_index += 1
     
-    logger.info("Total files created : {}".format(file_index))
+    #logger.info("Total files created : {}".format(file_index))
     return label_list
 
 def time2frame(df, fps):
@@ -112,7 +120,7 @@ def time2frame(df, fps):
 
     return start_time, end_time
 
-def melSpectFeature(conf, audio_path, df, aug):
+def melSpectFeature(conf, audio_path, aug):
     """
     Function to make Mel Spectrogram features with optional augmentation
     """
@@ -120,7 +128,7 @@ def melSpectFeature(conf, audio_path, df, aug):
     resample = T.Resample(sr, conf.features.sample_rate)
     data = resample(data)
     #data = (data - torch.mean(data)) / torch.std(data)
-    chunk_samples = conf.features.sample_rate * 5
+    chunk_samples = int(conf.features.sample_rate * 0.25)
     feature = torch.Tensor([])
     
     for idx in range(0, data.shape[1]-chunk_samples, chunk_samples):
@@ -139,18 +147,9 @@ def melSpectFeature(conf, audio_path, df, aug):
                 chunk_feature = T.TimeMasking(time_mask_param=conf.features.time_mask)(chunk_feature)
         feature = torch.cat((feature, chunk_feature), dim=1)
 
-    if conf.features.frontend == 'PCEN':
-        feature = torch.unsqueeze(feature, dim=0)
-        feature = PCENTransform(conf=conf)(feature)
-    elif conf.features.frontend == 'log':
-        feature = torch.log(feature + 1E-6)
-    else:
-        feature = feature
-
     feature = torch.squeeze(feature)
     feature = torch.transpose(feature, 0, 1) 
-
-    return feature, df
+    return feature
 
 def featureExtract(conf=None,mode=None):
     '''
@@ -179,10 +178,10 @@ def featureExtract(conf=None,mode=None):
     seg_len = int(round(conf.features.seg_len * fps))
     hop_seg = int(round(conf.features.hop_seg * fps))
     
-    aug = False
+    #aug = False
 
     if mode == 'train':
-        aug = conf.features.aug_train
+        #aug = conf.features.aug_train
         logger.info("=== Processing training set ===")
         csv_files = [file for path, _, _ in os.walk(conf.path.train_dir) 
                      for file in glob(os.path.join(path, '*.csv')) ]
@@ -191,17 +190,16 @@ def featureExtract(conf=None,mode=None):
         train_file.create_dataset('features', shape=(0, seg_len, conf.features.n_mels),
                           maxshape=(None, seg_len, conf.features.n_mels))
         num_extract = 0
-        
-        for file in csv_files:
+        for file in tqdm(csv_files):
             split_list = file.split('/')
             glob_cls_name = split_list[split_list.index('Training_Set') + 1]
             file_name = split_list[split_list.index('Training_Set') + 2]
 
             df = pd.read_csv(file, header=0, index_col=False)
             audio_path = file.replace('csv', 'wav')
-            logger.info("Processing file name {}".format(audio_path))
+            #logger.info("Processing file name {}".format(audio_path))
 
-            feature, df = melSpectFeature(conf, audio_path, df, aug=aug)
+            feature = melSpectFeature(conf, audio_path, aug=True)
 
             df_pos = df[(df == 'POS').any(axis=1)]
             
@@ -209,7 +207,7 @@ def featureExtract(conf=None,mode=None):
                 df_pos, feature, 
                 glob_cls_name,
                 train_file, seg_len,
-                hop_seg, fps
+                hop_seg, fps, conf
             )
             label_tr.append(label_list)
         
@@ -268,7 +266,8 @@ def featureExtract(conf=None,mode=None):
             start_time, end_time = time2frame(df_test, fps)
 
             index_sup = np.where(Q_list == 'POS')[0][:conf.train.n_shot]
-            feature, df_test = melSpectFeature(conf, audio_path, df_test, aug=False)
+            feature = melSpectFeature(conf, audio_path, aug=False)
+            feature = torch.log(feature + 1E-6)
 
             query_idx_start = end_time[index_sup[-1]]
             negative_idx_end = feature.shape[0] - 1

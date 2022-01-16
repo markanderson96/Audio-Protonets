@@ -5,6 +5,7 @@ set:
   eval: false
   gpus: 1
   data: bioacoustics
+  n_dim: 128
 
 path:
   root_dir: /home/mark/projects/DCASE2021
@@ -18,7 +19,7 @@ path:
   test_feat: ${path.feat_path}/feat_test
   model: ${path.root_dir}/models
   best_model: ${path.model}/best_*_${set.data}.ckpt
-  last_model: ${path.model}/latest_*_${set.data}.ckpt
+  last_model: ${path.model}/latest_val_loss=0.72_bioacoustics.ckpt
 
 features:
   freq_mask: 10
@@ -26,19 +27,19 @@ features:
   time_stretch: 1.1
   seg_len: 0.2
   hop_seg: 0.05
-  sample_rate: 22050
-  fmin: 600
-  fmax: 11025
+  sample_rate: 16000
+  fmin: 800
+  fmax: 8000
   n_mels: 80
   n_fft: 512
   hop: 128
-  frontend: log
+  frontend: None
   aug_train: true
 
 train:
-  n_shot: 5
+  n_shot: 10
   k_way: 10
-  epochs: 1000
+  epochs: 250
   lr: 0.0001
   momentum: 0.85
   factor: 0.5

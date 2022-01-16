@@ -45,8 +45,8 @@ def eval_prototypes(conf=None, hdf_eval=None, strt_index_query=None, logger=None
                                            batch_sampler=None,
                                            batch_size=conf.eval.query_batch_size,
                                            shuffle=False)
-    neg_set_feat = torch.zeros(0, 640).cpu()
-    pos_set_feat = torch.zeros(0, 640).cpu()
+    neg_set_feat = torch.zeros(0, 128).cpu()
+    pos_set_feat = torch.zeros(0, 128).cpu()
 
     Model = Protonet(conf)
 
@@ -146,12 +146,14 @@ def get_probability(pos_proto ,neg_proto, query_set_out):
     #breakpoint()
     dists_e = euclidean_dist(query_set_out, prototypes)
     dists_n = norm_dist(query_set_out, prototypes)
-    dists = torch.sqrt(dists_e + 0.5 * dists_n)
+    dists = dists_e
     '''  Taking inverse distance for converting distance to probabilities'''
     inverse_dist = torch.div(1.0, dists_e)
     prob = torch.softmax(inverse_dist, dim=1)
     '''  Probability array for positive class'''
+    breakpoint()
     prob_pos = prob[:,0]
+    prob_pos = 1.0 - prob_pos
     
     return prob_pos.detach().cpu().tolist()
 

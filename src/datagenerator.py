@@ -36,7 +36,7 @@ def balance_class_distribution(X,Y):
     x_index = [[index] for index in range(len(X))]
     set_y = set(Y)
 
-    ros = SMOTE()
+    ros = RandomOverSampler()
     x_unifm, y_unifm = ros.fit_resample(x_index, Y)
     unifm_index = [index_new[0] for index_new in x_unifm]
 
