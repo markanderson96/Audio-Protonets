@@ -25,12 +25,14 @@ class Protonet(pl.LightningModule):
         )
         self.conf = conf
         self.encoder = nn.Sequential(
-            conv_block(1, 64),
-            conv_block(64, 64),
-            conv_block(64, 64),
-            conv_block(64, 64),
+            conv_block(1, conf.set.n_dim),
+            conv_block(conf.set.n_dim, conf.set.n_dim),
+            conv_block(conf.set.n_dim, conf.set.n_dim),
+            conv_block(conf.set.n_dim, conf.set.n_dim),
+            conv_block(conf.set.n_dim, conf.set.n_dim),
+            conv_block(conf.set.n_dim, conf.set.n_dim, kernel_size=(3,2)),
         )
-        self.example_input_array = torch.rand(1, 43, conf.features.n_mels)
+        self.example_input_array = torch.rand(1, 125, conf.features.n_mels)
 
         self.emb_counter = 0
         self.data_counter = 0
@@ -64,17 +66,18 @@ class Protonet(pl.LightningModule):
 
         q_idxs = torch.stack(list(map(lambda c:Y_target.eq(c).nonzero()[n_support:], classes))).view(-1)
         q_samples = Y_in.cpu()[q_idxs]
-
-        dists_e = euclidean_dist(q_samples, prototypes)
-        dists_n = norm_dist(q_samples, prototypes)
-        dists_m = man_dist(q_samples, prototypes)
+        
         if self.distance == 'euclidean':
+            dists_e = euclidean_dist(q_samples, prototypes)
             if self.norm:
+                dists_n = norm_dist(q_samples, prototypes)
                 dists = torch.sqrt(dists_e + 0.5 * dists_n)
             else:
                 dists = dists_e
         elif self.distance == 'manhattan':
+            dists_m = man_dist(q_samples, prototypes)
             if self.norm:
+                dists_n = norm_dist(q_samples, prototypes)
                 dists = torch.sqrt(dists_m + 0.5 * dists_n)
             else:
                 dists = dists_m
@@ -111,7 +114,7 @@ class Protonet(pl.LightningModule):
 
         # get data for t-SNE every 10 steps
         if self.emb_counter % 5 == 0:
-            if self.data_counter % 10 == 0:
+            if self.data_counter % 20 == 0:
                 self.y_val_emb = torch.cat((self.y_val_emb, Y.detach().cpu()))
                 self.y_out_emb = torch.cat((self.y_out_emb, Y_out.detach().cpu()))
             self.data_counter += 1
