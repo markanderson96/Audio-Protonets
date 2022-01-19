@@ -287,18 +287,6 @@ def evaluate(pred_file_path, ref_file_path, team_name, dataset, savepath, metada
                     }
     
     print("\nOverall_scores:",  overall_scores)
-    print("\nwriting report")
-    if metadata:
-        build_report(overall_scores, scores_per_set, scores_per_audiofile,
-                savepath, 
-                dataset,
-                team_name,
-                scores_per_class=scores_per_class_per_set)
-    else:
-        build_report(overall_scores, scores_per_set, scores_per_audiofile,
-                savepath, 
-                dataset,
-                team_name)
     
     return
 
