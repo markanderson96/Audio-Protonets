@@ -62,7 +62,6 @@ def create_labels(df_pos, feature, glob_cls_name, train_file, seg_len, hop_seg, 
             while end_ind - (str_ind + shift) > seg_len:
 
                 feature_patch = feature[int(str_ind + shift):int(str_ind + shift + seg_len)]
-                feature_patch = frontend_select(feature_patch, label, conf)
                     
                 train_file['features'].resize((file_index + 1, feature_patch.shape[0], feature_patch.shape[1]))
                 train_file['features'][file_index] = feature_patch
@@ -71,7 +70,6 @@ def create_labels(df_pos, feature, glob_cls_name, train_file, seg_len, hop_seg, 
                 shift = shift + hop_seg
 
             feature_patch_last = feature[end_ind - seg_len:end_ind]
-            feature_patch_last = frontend_select(feature_patch_last, label, conf)
             train_file['features'].resize((file_index + 1 , feature_patch.shape[0], feature_patch.shape[1]))
             
             train_file['features'][file_index] = feature_patch_last
@@ -91,7 +89,6 @@ def create_labels(df_pos, feature, glob_cls_name, train_file, seg_len, hop_seg, 
             feature_patch_new = np.tile(feature_patch, (repeat_num, 1))
             feature_patch_new = feature_patch_new[0:int(seg_len)]
             feature_patch_new = torch.tensor(feature_patch_new)
-            feature_patch_new = frontend_select(feature_patch_new, label, conf)
 
             train_file['features'].resize((file_index+1, feature_patch_new.shape[0], feature_patch_new.shape[1]))
             train_file['features'][file_index] = feature_patch_new
@@ -99,25 +96,6 @@ def create_labels(df_pos, feature, glob_cls_name, train_file, seg_len, hop_seg, 
             file_index += 1
     
     return label_list
-
-def frontend_select(feature, label, conf):
-    if label == "BG":
-        #feature = torch.log10(feature + 1E-6)
-        feature = torch.unsqueeze(feature, dim=0)
-        feature = PCENTransform(conf=conf)(feature)
-        feature = torch.squeeze(feature)
-    else:
-        feature = torch.unsqueeze(feature, dim=0)
-        feature = PCENTransform(conf=conf)(feature)
-        feature = torch.squeeze(feature)
-
-    if conf.features.aug_train:
-        if torch.rand(1) < 0.25:
-            feature = T.FrequencyMasking(freq_mask_param=conf.features.freq_mask)(feature)
-        if torch.rand(1) < 0.25:  
-            feature = T.TimeMasking(time_mask_param=conf.features.time_mask)(feature)
-
-    return feature
 
 def time2frame(df, fps):
     'Margin of 25 ms around the onset and offsets'
@@ -137,19 +115,18 @@ def melSpectFeature(conf, audio_path):
     data, sr = torchaudio.load(audio_path)
     resample = T.Resample(sr, conf.features.sample_rate)
     data = resample(data)
-    #data = (data - torch.mean(data)) / torch.std(data)
     
     feature = T.MelSpectrogram(
         n_fft=conf.features.n_fft,
         hop_length=conf.features.hop,
-        power=1,
+        power=2,
         f_min=conf.features.fmin,
         f_max=conf.features.fmax,
         n_mels=conf.features.n_mels,
     )(data)
     feature = torch.squeeze(feature)
     feature = torch.transpose(feature, 0, 1) 
-    
+
     return feature
 
 def featureExtract(conf=None,mode=None):
@@ -198,7 +175,6 @@ def featureExtract(conf=None,mode=None):
 
             df = pd.read_csv(file, header=0, index_col=False)
             audio_path = file.replace('csv', 'wav')
-            #logger.info("Processing file name {}".format(audio_path))
 
             feature = melSpectFeature(conf, audio_path)
 
@@ -268,10 +244,6 @@ def featureExtract(conf=None,mode=None):
 
             index_sup = np.where(Q_list == 'POS')[0][:conf.train.n_shot]
             feature = melSpectFeature(conf, audio_path)
-            #feature = torch.log10(feature + 1E-6)
-            feature = torch.unsqueeze(feature, dim=0)
-            feature = PCENTransform(conf=conf)(feature)
-            feature = torch.squeeze(feature)
 
             query_idx_start = end_time[index_sup[-1]]
             negative_idx_end = feature.shape[0] - 1
