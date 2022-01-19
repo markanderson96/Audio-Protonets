@@ -30,8 +30,9 @@ def eval_prototypes(conf=None, hdf_eval=None, strt_index_query=None, logger=None
 
     gen_eval = Datagen_test(hdf_eval,conf)
     X_pos, X_neg, X_query = gen_eval.generate_eval()
+    eval_class_list = gen_eval.class_dict
 
-    X_pos = torch.tensor(X_pos)#
+    X_pos = torch.tensor(X_pos)
     Y_pos = torch.LongTensor(np.ones(X_pos.shape[0]))
     X_neg = torch.tensor(X_neg)
     Y_neg = torch.LongTensor(np.zeros(X_neg.shape[0]))
@@ -45,8 +46,8 @@ def eval_prototypes(conf=None, hdf_eval=None, strt_index_query=None, logger=None
                                            batch_sampler=None,
                                            batch_size=conf.eval.query_batch_size,
                                            shuffle=False)
-    neg_set_feat = torch.zeros(0, 128).cpu()
-    pos_set_feat = torch.zeros(0, 128).cpu()
+    neg_set_feat = torch.zeros(0, 384).cpu()
+    pos_set_feat = torch.zeros(0, 384).cpu()
 
     Model = Protonet(conf)
 
@@ -68,7 +69,7 @@ def eval_prototypes(conf=None, hdf_eval=None, strt_index_query=None, logger=None
         neg_dataset = torch.utils.data.TensorDataset(X_neg, Y_neg)
         negative_loader = torch.utils.data.DataLoader(dataset=neg_dataset, batch_sampler=None, batch_size=batch_size_neg)
 
-        batch_samplr_pos = EpisodicBatchSampler(Y_pos, num_batch_query + 1, 1, conf.train.n_shot)
+        batch_samplr_pos = EpisodicBatchSampler(Y_pos, num_batch_query + 1, 1, conf.train.n_shot, eval_class_list)
         pos_dataset = torch.utils.data.TensorDataset(X_pos, Y_pos)
         pos_loader = torch.utils.data.DataLoader(dataset=pos_dataset)
 
@@ -110,12 +111,11 @@ def eval_prototypes(conf=None, hdf_eval=None, strt_index_query=None, logger=None
     prob_final = np.mean(np.array(prob_comb),axis=0)
 
     krn = np.array([1, -1])
-    
-    prob_med_filt = medFilt(prob_final, 5)
 
     prob_thresh = np.where(prob_final > conf.eval.threshold, 1, 0)
     changes = np.convolve(krn, prob_thresh)
-
+    
+    
     onset_frames = np.where(changes == 1)[0]
     offset_frames = np.where(changes == -1)[0]
 
@@ -147,13 +147,13 @@ def get_probability(pos_proto ,neg_proto, query_set_out):
     dists_e = euclidean_dist(query_set_out, prototypes)
     dists_n = norm_dist(query_set_out, prototypes)
     dists = dists_e
+    #breakpoint()
     '''  Taking inverse distance for converting distance to probabilities'''
     inverse_dist = torch.div(1.0, dists_e)
     prob = torch.softmax(inverse_dist, dim=1)
     '''  Probability array for positive class'''
-    breakpoint()
+    #breakpoint()
     prob_pos = prob[:,0]
-    prob_pos = 1.0 - prob_pos
     
     return prob_pos.detach().cpu().tolist()
 

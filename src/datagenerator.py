@@ -17,10 +17,11 @@ def class_to_int(label_array,class_set):
     -class_set: unique classes in label_array
     Out:
     -y: label to index values
+    -label2index: dict defining labels
     '''
-    label2indx = {label:index for index,label in enumerate(class_set)}
+    label2indx = {label:index for index, label in enumerate(class_set)}
     y = np.array([label2indx[label] for label in label_array])
-    return y
+    return y, label2indx
 
 
 def balance_class_distribution(X,Y):
@@ -70,7 +71,7 @@ class Datagen(object):
 
         class_set = set(self.labels)
 
-        self.y = class_to_int(self.labels,class_set)
+        self.y, self.class_dict = class_to_int(self.labels,class_set)
         self.x,self.y = balance_class_distribution(self.x,self.y)
         array_train = np.arange(len(self.x))
         _,_,_,_,train_array,valid_array = train_test_split(self.x,self.y,array_train,random_state=42,stratify=self.y)

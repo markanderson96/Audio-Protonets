@@ -14,7 +14,7 @@ from features import *
 from utils import euclidean_dist, man_dist, norm_dist
 
 class Protonet(pl.LightningModule):
-    def __init__(self, conf):
+    def __init__(self, conf, class_dict=None):
         super().__init__()
         def conv_block(in_channels, out_channels, kernel_size=3, pooling=2):
             return nn.Sequential(
@@ -39,6 +39,10 @@ class Protonet(pl.LightningModule):
         self.y_out_emb = torch.tensor([])
         self.distance = conf.train.distance
         self.norm = conf.train.norm
+        if class_dict:
+            self.class_dict = {value:key for key, value in class_dict.items()}
+        else:
+            self.class_dict = None
     
     def forward(self, x):
         (num_samples, seq_len, fft_bins) = x.shape
@@ -118,7 +122,6 @@ class Protonet(pl.LightningModule):
                 self.y_out_emb = torch.cat((self.y_out_emb, Y_out.detach().cpu()))
             self.data_counter += 1
 
-        #log = {'val_loss':val_loss, 'val_acc':val_acc}
         self.log('val_loss', val_loss)
         self.log('val_acc', val_acc)
         self.logger.experiment.add_scalars("losses", {"val_loss": val_loss}, global_step=self.current_epoch)
@@ -130,15 +133,22 @@ class Protonet(pl.LightningModule):
         val_acc = torch.stack([x['val_acc'] for x in outputs]).mean()
 
         log = {'avg_val_loss':val_loss, 'avg_val_acc':val_acc}
-        #self.log('avg_val_loss', val_loss)
-        #self.log('avg_val_acc', val_acc)
 
         if self.emb_counter % 5 == 0:
             tensorboard = self.logger.experiment
-            tensorboard.add_embedding(self.y_out_emb,
-                                      metadata=self.y_val_emb,
-                                      global_step=self.current_epoch,
-                        )
+            if self.class_dict:
+                metadata = []
+                for i in range(len(self.y_val_emb)):
+                    metadata.append(self.class_dict[int(self.y_val_emb[i].long())])
+                tensorboard.add_embedding(self.y_out_emb,
+                                          metadata=metadata,     
+                                          global_step=self.current_epoch,
+                )
+            else:
+                tensorboard.add_embedding(self.y_out_emb,
+                                          metadata=self.y_val_emb,
+                                          global_step=self.current_epoch,
+                )
         
             self.emb_counter = 0
             self.data_counter = 0
