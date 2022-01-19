@@ -14,60 +14,53 @@ class PCENTransform(nn.Module):
         alpha=0.98, 
         delta=2, 
         r=0.25, 
-        conf=None
     ):
         super().__init__()
-        self.s = s
-        self.alpha = alpha
-        self.delta = delta
-        self.r = r
+        # smoothing parameter
+        self.s = torch.nn.Parameter(Tensor([s]))
+        torch.nn.init.constant(self.s, s)
+
+        # AGC strength
+        self.alpha = torch.nn.Parameter(Tensor([alpha]))
+        torch.nn.init.constant(self.alpha, alpha)
+
+        # stabilised root compression using delta and r
+        self.delta = torch.nn.Parameter(Tensor([delta]))
+        torch.nn.init.constant(self.delta, delta)
+
+        self.r = torch.nn.Parameter(Tensor([r]))
+        torch.nn.init.constant(self.r, r)
+
+        # arbitrary constant to avoid division by 0
         self.eps = eps
-        self.conf = conf
-        self.register_buffer("last_state", torch.zeros(conf.features.n_mels))
-        self.reset()
 
-    def reset(self):
-        self.empty = True
+    def iir(self, x) -> Tensor:
+        s = torch.clamp(self.s, min=0.0, max=1.0)
+        M = [x[..., 0]]
+        for t in range(1, x.size(-1)):
+            m = (1. - s) * M[t - 1] + s * x[..., t]
+            M.append(m)
+        M = torch.stack(M, dim=-1)
+        return M
 
-    def forward(self, x) -> Tensor:
-        x, ls = self.pcen(
-            x, 
-            self.eps, 
-            self.s, 
-            self.alpha, 
-            self.delta, 
-            self.r, 
-            self.last_state, 
-            self.empty,
-        )
-        self.last_state = ls.detach()
-        self.empty = False
-        return x
+    def forward(self,
+                E: torch.Tensor,
+                ):
+        """
+        :param xs:      Input tensor (#batch, time, idim).
+        :param xs_mask: Input mask (#batch, 1, time).
+        :return:
+        """
+        alpha = torch.min(self.alpha, torch.ones(
+            self.alpha.size(), device=self.alpha.device))
+        r = torch.max(self.r, torch.ones(
+            self.r.size(), device=self.r.device))
 
-    def pcen(
-        self,
-        x: Tensor, 
-        eps: float, 
-        s: float, 
-        alpha: float, 
-        delta: float, 
-        r: float, 
-        last_state: Optional[Tensor] = None, 
-        empty: Optional[bool] = True,
-    ) -> Tuple[Tensor, Tensor]:
+        M = self.iir(E)
+        #pcen = xs.div_(smoother.add_(self.eps).pow_(self.alpha)).add_(self.delta).pow_(self.r).sub_(self.delta**self.r)
+        #pcen = ((xs / ((self.eps + smoother)**self.alpha) + self.delta)**(1./self.r)
+        #      - self.delta**(1./self.r))
+        pcen = (((E / ((self.eps + M)**self.alpha)) + self.delta)**self.r) - (self.delta**self.r)
+        pcen = 2 * (pcen - pcen.min()) / (pcen.max() - pcen.min()) - 1
 
-        frames = x.split(1, -2)
-        m_frames = []
-        if empty:
-            last_state = None
-        for frame in frames:
-            if last_state is None:
-                last_state = frame
-                m_frames.append(frame)
-                continue
-            m_frame = (1 - s) * last_state + s * frame
-            last_state = m_frame
-            m_frames.append(m_frame)
-        M = torch.cat(m_frames, 1)
-        pcen_ = x.div_(M.add_(eps).pow_(alpha)).add_(delta).pow_(r).sub_(delta**r)
-        return pcen_, last_state
+        return pcen
