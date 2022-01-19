@@ -11,7 +11,10 @@ from omegaconf import DictConfig
 
 from datagenerator import *
 from features import *
+from pcen import PCENTransform
 from utils import euclidean_dist, man_dist, norm_dist
+
+import torchvision
 
 class Protonet(pl.LightningModule):
     def __init__(self, conf, class_dict=None):
@@ -24,14 +27,17 @@ class Protonet(pl.LightningModule):
                 nn.MaxPool2d(pooling)
         )
         self.conf = conf
+        self.pcen = nn.Sequential(
+            PCENTransform(),
+        )
         self.encoder = nn.Sequential(
             conv_block(1, conf.set.n_dim),
             conv_block(conf.set.n_dim, conf.set.n_dim),
             conv_block(conf.set.n_dim, conf.set.n_dim),
             conv_block(conf.set.n_dim, conf.set.n_dim),
-            conv_block(conf.set.n_dim, conf.set.n_dim, kernel_size=(3,7), pooling=1),
+            conv_block(conf.set.n_dim, conf.set.n_dim, kernel_size=(2,3)),
         )
-        self.example_input_array = torch.rand(1, 125, conf.features.n_mels)
+        self.example_input_array = torch.rand(1, 50, conf.features.n_mels)
 
         self.emb_counter = 0
         self.data_counter = 0
@@ -47,6 +53,11 @@ class Protonet(pl.LightningModule):
     def forward(self, x):
         (num_samples, seq_len, fft_bins) = x.shape
         x = x.view(-1, 1, seq_len, fft_bins)
+        mel_grid = torchvision.utils.make_grid(x.transpose(2, 3), normalise=True, scale_each=True)
+        self.logger.experiment.add_image('mel', mel_grid, global_step=self.current_epoch)
+        x = self.pcen(x)
+        pcen_grid = torchvision.utils.make_grid(x.transpose(2, 3), normalise=True)
+        self.logger.experiment.add_image('pcen', pcen_grid, global_step=self.current_epoch)
         x = self.encoder(x)
         return x.view(x.size(0), -1)
 
@@ -84,7 +95,7 @@ class Protonet(pl.LightningModule):
                 dists = torch.sqrt(dists_m + 0.5 * dists_n)
             else:
                 dists = dists_m
-        
+        #breakpoint()
         log_p_y = F.log_softmax(-dists, dim=1).view(n_classes, n_query, -1)
 
         target_idxs = torch.arange(0, n_classes)
@@ -98,6 +109,7 @@ class Protonet(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         X, Y = batch
+        X = X.abs()
         Y_out = self(X)
         train_loss, train_acc = self.loss_function(Y_out, Y)
 
@@ -111,7 +123,8 @@ class Protonet(pl.LightningModule):
         return {'loss':train_loss}
 
     def validation_step(self, batch, batch_idx):
-        X, Y = batch         
+        X, Y = batch
+        X = X.abs()       
         Y_out = self(X)
         val_loss, val_acc = self.loss_function(Y_out, Y)
 
