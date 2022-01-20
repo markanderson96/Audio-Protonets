@@ -10,9 +10,9 @@ class PCENTransform(nn.Module):
     def __init__(
         self, 
         eps=1E-6, 
-        s=0.025, 
-        alpha=0.98, 
-        delta=2, 
+        s=0.015, 
+        alpha=0.8, 
+        delta=10, 
         r=0.25, 
     ):
         super().__init__()
@@ -57,10 +57,8 @@ class PCENTransform(nn.Module):
             self.r.size(), device=self.r.device))
 
         M = self.iir(E)
-        #pcen = xs.div_(smoother.add_(self.eps).pow_(self.alpha)).add_(self.delta).pow_(self.r).sub_(self.delta**self.r)
-        #pcen = ((xs / ((self.eps + smoother)**self.alpha) + self.delta)**(1./self.r)
-        #      - self.delta**(1./self.r))
-        pcen = (((E / ((self.eps + M)**self.alpha)) + self.delta)**self.r) - (self.delta**self.r)
-        pcen = 2 * (pcen - pcen.min()) / (pcen.max() - pcen.min()) - 1
+        G = torch.div(E, torch.pow(torch.add(M, self.eps), self.alpha))
+        pcen = torch.sub(torch.pow(torch.add(G, self.delta), self.r), torch.pow(self.delta, self.r))
+        #pcen = 2 * (pcen - pcen.min()) / (pcen.max() - pcen.min()) - 1
 
         return pcen
