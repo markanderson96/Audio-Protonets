@@ -19,29 +19,29 @@ path:
   test_feat: ${path.feat_path}/feat_test
   model: ${path.root_dir}/models
   best_model: ${path.model}/best_*_${set.data}.ckpt
-  last_model: ${path.model}/latest_val_loss=0.27_bioacoustics.ckpt
+  last_model: ${path.model}/latest_val_loss=2.62_bioacoustics.ckpt
 
 features:
   freq_mask: 10
   time_mask: 10
   time_stretch: 1.1
-  seg_len: 0.2
-  hop_seg: 0.05
+  seg_len: 0.5
+  hop_seg: 0.125
   sample_rate: 16000
   fmin: 800
   fmax: 8000
   n_mels: 80
-  n_fft: 256
-  hop: 64
+  n_fft: 512
+  hop: 128
   frontend: None
   aug_train: true
 
 train:
   n_shot: 5
-  k_way: 2
-  epochs: 25
-  lr: 0.0001
-  momentum: 0.85
+  k_way: 5
+  epochs: 50
+  lr: 0.001
+  momentum: 0.9
   factor: 0.5
   threshold: 0.001
   patience: 3

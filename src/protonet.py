@@ -30,14 +30,18 @@ class Protonet(pl.LightningModule):
         self.pcen = nn.Sequential(
             PCENTransform(),
         )
+        self.pcen[0].s.requires_grad=False
+        self.pcen[0].alpha.requires_grad=False
+        self.pcen[0].delta.requires_grad=False
+        self.pcen[0].r.requires_grad=False
         self.encoder = nn.Sequential(
             conv_block(1, conf.set.n_dim),
             conv_block(conf.set.n_dim, conf.set.n_dim),
             conv_block(conf.set.n_dim, conf.set.n_dim),
             conv_block(conf.set.n_dim, conf.set.n_dim),
-            conv_block(conf.set.n_dim, conf.set.n_dim, kernel_size=(2,3)),
+            conv_block(conf.set.n_dim, conf.set.n_dim, kernel_size=(3,5)),
         )
-        self.example_input_array = torch.rand(1, 50, conf.features.n_mels)
+        self.example_input_array = torch.rand(1, 62, conf.features.n_mels)
 
         self.emb_counter = 0
         self.data_counter = 0
@@ -53,10 +57,11 @@ class Protonet(pl.LightningModule):
     def forward(self, x):
         (num_samples, seq_len, fft_bins) = x.shape
         x = x.view(-1, 1, seq_len, fft_bins)
-        mel_grid = torchvision.utils.make_grid(x.transpose(2, 3), normalise=True, scale_each=True)
+        mel = torch.log(x + 1E-6)
+        mel_grid = torchvision.utils.make_grid(mel.transpose(2, 3), normalise=True, scale_each=True)
         self.logger.experiment.add_image('mel', mel_grid, global_step=self.current_epoch)
         x = self.pcen(x)
-        pcen_grid = torchvision.utils.make_grid(x.transpose(2, 3), normalise=True)
+        pcen_grid = torchvision.utils.make_grid(x.transpose(2, 3), normalise=True, scale_each=True)
         self.logger.experiment.add_image('pcen', pcen_grid, global_step=self.current_epoch)
         x = self.encoder(x)
         return x.view(x.size(0), -1)
@@ -109,7 +114,6 @@ class Protonet(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         X, Y = batch
-        X = X.abs()
         Y_out = self(X)
         train_loss, train_acc = self.loss_function(Y_out, Y)
 
@@ -122,9 +126,16 @@ class Protonet(pl.LightningModule):
 
         return {'loss':train_loss}
 
+    def on_epoch_end(self) -> None:
+        if self.current_epoch >= self.conf.train.epochs//2:
+            self.pcen[0].s.requires_grad=True
+            self.pcen[0].alpha.requires_grad=True
+            self.pcen[0].delta.requires_grad=True
+            self.pcen[0].r.requires_grad=True
+        return super().on_epoch_end()   
+
     def validation_step(self, batch, batch_idx):
         X, Y = batch
-        X = X.abs()       
         Y_out = self(X)
         val_loss, val_acc = self.loss_function(Y_out, Y)
 
@@ -175,7 +186,7 @@ class Protonet(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.parameters(), 
                                     lr=self.conf.train.lr, 
-                                    momentum=self.conf.train.momentum)
+                                    momentum=self.conf.train.momentum,)
 
         lr_scheduler = {'scheduler': ReduceLROnPlateau(optimizer,
                                                        factor=self.conf.train.factor,
