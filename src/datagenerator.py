@@ -48,20 +48,6 @@ def balance_class_distribution(X,Y):
 
     return X_new, Y_new
 
-def norm_params(X):
-
-    '''  Normalize features
-        Args:
-        - X : Features
-        Out:
-        - mean : Mean of the feature set
-        - std: Standard deviation of the feature set
-        '''
-    mean = np.mean(X)
-    std = np.std(X)
-    return mean, std
-
-
 class Datagen(object):
     def __init__(self, conf):
         hdf_path = os.path.join(conf.path.train_feat, 'train.h5')
@@ -77,10 +63,6 @@ class Datagen(object):
         _,_,_,_,train_array,valid_array = train_test_split(self.x,self.y,array_train,random_state=42,stratify=self.y)
         self.train_index = train_array
         self.valid_index = valid_array
-        self.mean,self.std = norm_params(self.x[train_array])
-
-    def feature_scale(self,X):
-        return (X-self.mean)/self.std
 
     def generate_train(self):
         ''' Returns normalized training and validation features.
@@ -99,8 +81,6 @@ class Datagen(object):
         Y_train = self.y[train_array]
         X_val = self.x[valid_array]
         Y_val = self.y[valid_array]
-        X_train = self.feature_scale(X_train)
-        X_val = self.feature_scale(X_val)
         return X_train,Y_train,X_val,Y_val
 
 class Datagen_test(Datagen):
@@ -120,8 +100,5 @@ class Datagen_test(Datagen):
         X_pos = (self.x_pos)
         X_neg = (self.x_neg)
         X_query = (self.x_query)
-        X_pos = self.feature_scale(X_pos)
-        X_neg = self.feature_scale(X_neg)
-        X_query = self.feature_scale(X_query)
 
         return X_pos, X_neg, X_query
