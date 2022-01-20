@@ -56,14 +56,14 @@ def main(conf: DictConfig):
         Y_val = torch.LongTensor(Y_val)
         train_class_dict = train_gen.class_dict
 
-        samples_per_class = conf.train.n_shot + 1
+        samples_per_class = conf.train.n_shot * 2
 
         batch_size = samples_per_class * conf.train.k_way
         num_batches_train = len(Y_train) // batch_size
         num_batches_val = len(Y_val) // batch_size
 
         train_sampler = EpisodicBatchSampler(Y_train, num_batches_train, conf.train.k_way, samples_per_class, train_class_dict)
-        val_sampler = EpisodicBatchSampler(Y_val, num_batches_val, 14, samples_per_class, train_class_dict)
+        val_sampler = EpisodicBatchSampler(Y_val, num_batches_val, conf.train.k_way, samples_per_class, train_class_dict)
 
         train_dataset = torch.utils.data.TensorDataset(X_train, Y_train)
         val_dataset = torch.utils.data.TensorDataset(X_val, Y_val)
