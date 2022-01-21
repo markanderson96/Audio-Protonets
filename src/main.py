@@ -56,7 +56,7 @@ def main(conf: DictConfig):
         Y_val = torch.LongTensor(Y_val)
         train_class_dict = train_gen.class_dict
 
-        samples_per_class = conf.train.n_shot + 1
+        samples_per_class = conf.train.n_shot * 2
 
         batch_size = samples_per_class * conf.train.k_way
         num_batches_train = len(Y_train) // batch_size
